@@ -66,7 +66,7 @@ param (
 
 #region Initial Setup
 Import-Module -Name AWSPowerShell.NetCore
-Import-Module PSSQLite
+Import-Module -Name PSSQLite
 
 function Write-Message {
     param (
