@@ -41,8 +41,18 @@
         -EndpointUrl "https://s3.us-east-1.wasabisys.com" `
         -PhotoDirectory "./photos" `
         -DatabasePath "./photo.db" `
-        -SearchString "*" `
         -RunspacesMaxCount 8
+
+    .\backup.ps1 `
+        -WasabiAccessKeyId <key_id> `
+        -WasabiSecretAccessKey <secret_access_key> `
+        -EncryptionPassword <enc_password> `
+        -BucketName <bucket_name> `
+        -Operation "restore" `
+        -EndpointUrl "https://s3.us-east-1.wasabisys.com" `
+        -PhotoDirectory "./photos" `
+        -DatabasePath "./photo.db" `
+        -SearchString "mom"
 
 .NOTES
 Requires:
@@ -456,10 +466,23 @@ function Start-PhotoRestore {
         Write-Message -MessageType Info -Message "Restoring all photos from database..."
     } else {
         Write-Message -MessageType Info -Message "Restoring photos matching search string '$SearchString' from database..."
-        $photo_names = Invoke-SqliteQuery -DataSource $DatabasePath -Query "SELECT name FROM Photo WHERE name LIKE '%$SearchString%'"
+        $photo_names = Invoke-SqliteQuery -DataSource $DatabasePath -Query "SELECT * FROM Photo WHERE name LIKE '%$SearchString%'"
         $photo_names | ForEach-Object {
-            $photo_name = $_.name
-            Write-Message -MessageType Info -Message "Restoring photo $photo_name..."
+            $photoName = $_.name
+            $photoLocation = $_.location
+            Write-Message -MessageType Info -Message "Restoring photo $($photoLocation)$photoName..."
+
+            $bucketName = $photoLocation.Split('/')[0]
+            $photoKey = "$($location.Split('/')[1])/$photoname"
+
+            Read-S3Object `
+                -BucketName $bucketName `
+                -Key $photoKey `
+                -File "$PhotoDirectory/$photoName" `
+                -EndpointUrl $EndpointUrl
+
+            Protect-File -FilePath "$PhotoDirectory/$photoName" -Password $EncryptionPassword
+            Remove-Item -Path "$PhotoDirectory/$photoName"
         }
     }
 }
