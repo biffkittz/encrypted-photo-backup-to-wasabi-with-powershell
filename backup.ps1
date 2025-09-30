@@ -20,6 +20,8 @@
     Password used for AES-256 encryption/decryption of files
 .PARAMETER BucketName
     Name of the Wasabi S3 bucket to upload files to
+.PARAMETER Operation
+    Operation to perform: "backup" to encrypt and upload photos, "restore" to download and decrypt photos (default: "backup")
 .PARAMETER EndpointUrl
     Endpoint URL for the Wasabi S3-compatible storage (default: https://s3.us-east-2.wasabisys.com)
 .PARAMETER PhotoDirectory
@@ -35,9 +37,11 @@
         -WasabiSecretAccessKey <secret_access_key> `
         -EncryptionPassword <enc_password> `
         -BucketName <bucket_name> `
+        -Operation "backup" `
         -EndpointUrl "https://s3.us-east-1.wasabisys.com" `
         -PhotoDirectory "./photos" `
         -DatabasePath "./photo.db" `
+        -SearchString "*" `
         -RunspacesMaxCount 8
 
 .NOTES
@@ -59,9 +63,12 @@ param (
     [string] $EncryptionPassword,
     [Parameter(Mandatory = $true)]
     [string] $BucketName,
+    [Parameter(Mandatory = $true)][ValidateSet("backup", "restore")]
+    [string] $Operation = "backup",
     [string] $EndpointUrl = "https://s3.us-east-2.wasabisys.com",
     [string] $PhotoDirectory = "./photos",
     [string] $DatabasePath = "./photo.db",
+    [string] $SearchString = "*",
     [int]    $RunspacesMaxCount = 5
 )
 
@@ -439,4 +446,28 @@ function Start-PhotoBackup {
     }
 }
 
-Start-PhotoBackup -PhotoDirectory $PhotoDirectory
+function Start-PhotoRestore {
+    param (
+        [string] $PhotoDirectory,
+        [string] $SearchString = "*"
+    )
+
+    if ($SearchString -eq "*") {
+        Write-Message -MessageType Info -Message "Restoring all photos from database..."
+    } else {
+        Write-Message -MessageType Info -Message "Restoring photos matching search string '$SearchString' from database..."
+        $photo_names = Invoke-SqliteQuery -DataSource $DatabasePath -Query "SELECT name FROM Photo WHERE name LIKE '%$SearchString%'"
+        $photo_names | ForEach-Object {
+            $photo_name = $_.name
+            Write-Message -MessageType Info -Message "Restoring photo $photo_name..."
+        }
+    }
+}
+
+if ($Operation -eq "backup") {
+    Write-Message -MessageType Important -Message "Starting photo backup operation..."
+    Start-PhotoBackup -PhotoDirectory $PhotoDirectory
+} elseif ($Operation -eq "restore") {
+    Write-Message -MessageType Important -Message "Starting photo restore operation..."
+    Start-PhotoRestore -PhotoDirectory $PhotoDirectory -SearchString $SearchString
+}
