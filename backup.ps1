@@ -43,6 +43,7 @@
 .NOTES
 Requires:
 - AWS Tools for PowerShell (AWSPowerShell.NetCore module)
+- AWS CLI installed and configured
 - PSSQLite module for SQLite database access
 - SQLite
 - Wasabi account
