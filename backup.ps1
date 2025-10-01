@@ -28,8 +28,12 @@
     Directory containing photos to back up (default: ./photos)
 .PARAMETER DatabasePath
     Path to the SQLite database file for tracking uploaded files (default: ./photo.db)
+.PARAMETER SearchString
+    Search string to filter photos to restore (default: "*", meaning all photos)
 .PARAMETER RunspacesMaxCount
     Maximum number of parallel runspaces for uploading files (default: 5)
+.PARAMETER ShouldRenamePhotos
+    Whether to rename photos by feeding them to a local LLM and having it output a new file name (default: $false)
 
 .EXAMPLE
     .\backup.ps1 `
@@ -42,6 +46,7 @@
         -PhotoDirectory "./photos" `
         -DatabasePath "./photo.db" `
         -RunspacesMaxCount 8
+        -ShouldRenamePhotos $true
 
     .\backup.ps1 `
         -WasabiAccessKeyId <key_id> `
@@ -61,6 +66,7 @@ Requires:
 - PSSQLite module for SQLite database access
 - SQLite
 - Wasabi account
+- For image analysis using gemma3:4b, run gemma3:4b, or another multimodal LLM, locally using ollama
 
 #>
 
@@ -79,7 +85,8 @@ param (
     [string] $PhotoDirectory = "./photos",
     [string] $DatabasePath = "./photo.db",
     [string] $SearchString = "*",
-    [int]    $RunspacesMaxCount = 5
+    [int]    $RunspacesMaxCount = 5,
+    [bool]   $ShouldRenamePhotos = $false
 )
 
 #region Initial Setup
@@ -397,9 +404,19 @@ function Start-PhotoBackup {
         New-Item -ItemType Directory -Path "$PhotoDirectory/outbox"
     }
 
-    # Encrypt photos in the photo directory and move them to the outbox directory
+    # Optionally rename and encrypt photos in the photo directory, and move them to the outbox directory
     Get-ChildItem -Path $PhotoDirectory | ForEach-Object {
         $file = $_
+
+        if ($ShouldRenamePhotos) {
+            $newName = ./get_photo_file_name_via_llm_image_analysis.py $file.FullName
+
+            $newNameWithExtension = "$newName$($file.Extension)"
+            if ($newNameWithExtension -ne $file.Name) {
+                Write-Message -MessageType Info -Message "Renaming file $($file.Name) to $newNameWithExtension"
+                $file = Rename-Item -Path $file.FullName -NewName $newNameWithExtension -PassThru
+            }
+        }
 
         # compute hash of the unencrypted file (the same file after different encryptions will have different hashes)
         $hashString = $(Get-FileHash -Path $file -Algorithm SHA512).Hash
