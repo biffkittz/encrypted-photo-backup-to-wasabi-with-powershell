@@ -66,6 +66,7 @@ Requires:
 - PSSQLite module for SQLite database access
 - SQLite
 - Wasabi account
+- python 3.x to run get_photo_file_name_via_llm_image_analysis.py script, which calls a local LLM server
 - For image analysis using gemma3:4b, run gemma3:4b, or another multimodal LLM, locally using ollama
 
 #>
